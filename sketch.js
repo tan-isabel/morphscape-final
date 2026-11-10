@@ -1,5 +1,5 @@
 
-// =====================================================
+ // =====================================================
 // MORPHSCAPE FINAL - HAND TRACKING + BLE
 //
 // 36 PHYSICAL UNITS
@@ -9,7 +9,7 @@
 // ONE FIST = PALM CENTRE
 //
 // CAMERA PREVIEW ENABLED
-// PREVIOUS 24-LAYER GLOW VERSION
+// SOFT GRADIENT GLOW
 // =====================================================
 
 let handPose;
@@ -27,6 +27,7 @@ const MS_NEUTRAL = 90;
 const MS_MIN = 5;
 const MS_MAX = 180;
 
+// Confirmed physical servo-to-PCA mapping
 const msChannelForServo = [
   0, 1, 8, 9,
   2, 3, 10, 11,
@@ -34,6 +35,7 @@ const msChannelForServo = [
   6, 7, 14, 15
 ];
 
+// Maximum convex mountain
 const msMountainUp = [
   110, 126, 119, 103,
   135, 166, 151, 114,
@@ -41,6 +43,7 @@ const msMountainUp = [
   105, 132, 121, 99
 ];
 
+// Maximum concave valley
 const msMountainDown = [
   70, 55, 63, 76,
   47, 17, 31, 66,
@@ -48,6 +51,7 @@ const msMountainDown = [
   79, 51, 61, 83
 ];
 
+// Staggered 4 x 4 coordinates
 const msCoordinates = Array.from(
   { length: 16 },
   (_, i) => ({
@@ -84,6 +88,7 @@ async function setup() {
   createCanvas(windowWidth, windowHeight);
   pixelDensity(1);
 
+  // Original working BLE setup
   bleSetup();
 
   resetButton = createButton("RESET");
@@ -420,13 +425,16 @@ function msUpdateGesture() {
 }
 
 // =====================================================
-// PREVIOUS 24-LAYER GLOW
+// SOFT DIFFUSED GLOW
+// VISUAL CHANGE ONLY
 // =====================================================
 
 function msGlowSpot(x, y, rgb, opacity, radius) {
 
   noStroke();
 
+  // Many overlapping translucent layers
+  // create a soft, feathered glow.
   for (let layer = 24; layer >= 1; layer--) {
 
     const fraction = layer / 24;
