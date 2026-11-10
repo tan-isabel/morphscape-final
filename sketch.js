@@ -395,24 +395,24 @@ function msUpdateGesture() {
 // ORIGINAL WORKING LUMINOUS TRAILS
 // =====================================================
 
-function msCloudPalette(direction) {
-  // Soft reference-style gradients: no neon line and no white centre.
+function msBrushPalette(direction) {
+  // Upward = warm summer colors. Downward = aqua/ocean colors.
   return direction === "down"
     ? [
-        [185, 165, 255], // lavender
-        [232, 165, 244], // lilac
-        [255, 178, 220], // pink haze
-        [160, 145, 255]  // violet
+        [20, 245, 220],  // bright aqua
+        [0, 205, 205],   // turquoise
+        [35, 165, 235],  // aqua blue
+        [80, 125, 255]   // cool blue
       ]
     : [
-        [18, 235, 220],  // cyan
-        [42, 182, 255],  // blue-cyan
-        [120, 145, 255], // blue-violet
-        [215, 175, 255]  // lavender
+        [255, 92, 150],  // summer coral pink
+        [255, 135,  90], // warm pink-orange
+        [255, 185,  70], // sunny orange
+        [255, 225, 125]  // soft summer yellow
       ];
 }
 
-function msBlendPalette(palette, t) {
+function msBlendBrushPalette(palette, t) {
   const scaled = msClamp(t, 0, 1) * (palette.length - 1);
   const index = Math.min(
     Math.floor(scaled),
@@ -425,10 +425,40 @@ function msBlendPalette(palette, t) {
   );
 }
 
-function msDrawCloudBlob(x, y, rgb, radius, alpha) {
-  noStroke();
-  fill(rgb[0], rgb[1], rgb[2], alpha);
-  ellipse(x, y, radius * 1.55, radius);
+function msDrawBrushSegment(a, b, rgb, fade, width) {
+  const ctx = drawingContext;
+  const color = `rgba(${Math.round(rgb[0])}, ${Math.round(rgb[1])}, ${Math.round(rgb[2])},`;
+
+  // Large soft atmospheric halo.
+  ctx.save();
+  ctx.shadowColor = `${color}${Math.max(0.18, fade * 0.32)})`;
+  ctx.shadowBlur = width * 3.8;
+  stroke(rgb[0], rgb[1], rgb[2], fade * 48);
+  strokeWeight(width * 3.1);
+  strokeCap(ROUND);
+  line(a.x, a.y, b.x, b.y);
+  ctx.restore();
+
+  // Colored luminous body.
+  ctx.save();
+  ctx.shadowColor = `${color}${Math.max(0.25, fade * 0.55)})`;
+  ctx.shadowBlur = width * 1.8;
+  stroke(rgb[0], rgb[1], rgb[2], fade * 145);
+  strokeWeight(width * 1.45);
+  strokeCap(ROUND);
+  line(a.x, a.y, b.x, b.y);
+  ctx.restore();
+
+  // Bright, colored brush center. It is not a flat white line.
+  stroke(
+    Math.min(255, rgb[0] + 48),
+    Math.min(255, rgb[1] + 48),
+    Math.min(255, rgb[2] + 48),
+    fade * 205
+  );
+  strokeWeight(Math.max(2.2, width * 0.42));
+  strokeCap(ROUND);
+  line(a.x, a.y, b.x, b.y);
 }
 
 function msDrawTrails() {
@@ -447,8 +477,7 @@ function msDrawTrails() {
   let modes = [];
 
   if (detected.length >= 2) {
-    positions = detected.slice(0, 2)
-      .map(h => h.fingertip);
+    positions = detected.slice(0, 2).map(h => h.fingertip);
     modes = ["FINGERTIP", "FINGERTIP"];
   } else if (
     detected.length === 1 &&
@@ -478,11 +507,7 @@ function msDrawTrails() {
         ? Math.hypot(p.x - old.x, p.y - old.y)
         : 0;
 
-      if (
-        !old ||
-        jump < Math.max(width, height) * 0.22
-      ) {
-
+      if (!old || jump < Math.max(width, height) * 0.22) {
         const down = old && p.y - old.y > 1.5;
 
         msTrails[i].push({
@@ -497,72 +522,47 @@ function msDrawTrails() {
     }
 
     msTrails[i] = msTrails[i].filter(
-      pt => now - pt.time < 1100
+      pt => now - pt.time < 900
     );
 
     const trail = msTrails[i];
-    if (!trail.length) continue;
 
-    // Paint broad translucent clouds first. The canvas blur makes the
-    // trail dissolve into a soft atmospheric smear rather than a stroke.
-    drawingContext.save();
-    drawingContext.filter = "blur(34px)";
-
-    for (let j = 0; j < trail.length; j++) {
-      const pt = trail[j];
+    for (let j = 1; j < trail.length; j++) {
+      const a = trail[j - 1];
+      const b = trail[j];
       const life = msClamp(
-        1 - (now - pt.time) / 1100,
+        1 - (now - b.time) / 900,
         0,
         1
       );
-      const positionFade = 0.28 + 0.72 * (j / trail.length);
-      const palette = msCloudPalette(pt.direction);
-      const rgb = msBlendPalette(
-        palette,
-        j / Math.max(1, trail.length - 1)
+      const along = j / Math.max(1, trail.length - 1);
+      const fade = life * (0.25 + 0.75 * along);
+      const palette = msBrushPalette(b.direction);
+      const rgb = msBlendBrushPalette(palette, along);
+      const distance = Math.hypot(b.x - a.x, b.y - a.y);
+      const width = msClamp(
+        5 + distance * 0.42 + 17 * fade,
+        5,
+        29
       );
-      const radius = 58 + 42 * life + 10 * Math.sin(j * 0.8);
 
-      msDrawCloudBlob(
-        pt.x,
-        pt.y,
-        rgb,
-        radius,
-        16 * life * positionFade
-      );
+      msDrawBrushSegment(a, b, rgb, fade, width);
     }
 
-    drawingContext.restore();
+    // A small glowing tip gives the brush its energetic leading edge.
+    if (p && trail.length) {
+      const newest = trail[trail.length - 1];
+      const palette = msBrushPalette(newest.direction);
+      const rgb = palette[0];
 
-    // Add a second, wider and fainter bloom to match the reference image.
-    drawingContext.save();
-    drawingContext.filter = "blur(68px)";
-
-    for (let j = 0; j < trail.length; j += 2) {
-      const pt = trail[j];
-      const life = msClamp(
-        1 - (now - pt.time) / 1100,
-        0,
-        1
-      );
-      const palette = msCloudPalette(pt.direction);
-      const rgb = msBlendPalette(
-        palette,
-        j / Math.max(1, trail.length - 1)
-      );
-
-      msDrawCloudBlob(
-        pt.x,
-        pt.y,
-        rgb,
-        125 + 45 * life,
-        8 * life
-      );
+      drawingContext.save();
+      drawingContext.shadowColor = `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, 0.8)`;
+      drawingContext.shadowBlur = 22;
+      noStroke();
+      fill(rgb[0], rgb[1], rgb[2], 115);
+      circle(p.x, p.y, 13);
+      drawingContext.restore();
     }
-
-    drawingContext.restore();
-
-    // Deliberately no line(), no stroke(), and no bright white centre.
   }
 }
 
