@@ -395,6 +395,42 @@ function msUpdateGesture() {
 // ORIGINAL WORKING LUMINOUS TRAILS
 // =====================================================
 
+function msCloudPalette(direction) {
+  // Soft reference-style gradients: no neon line and no white centre.
+  return direction === "down"
+    ? [
+        [185, 165, 255], // lavender
+        [232, 165, 244], // lilac
+        [255, 178, 220], // pink haze
+        [160, 145, 255]  // violet
+      ]
+    : [
+        [18, 235, 220],  // cyan
+        [42, 182, 255],  // blue-cyan
+        [120, 145, 255], // blue-violet
+        [215, 175, 255]  // lavender
+      ];
+}
+
+function msBlendPalette(palette, t) {
+  const scaled = msClamp(t, 0, 1) * (palette.length - 1);
+  const index = Math.min(
+    Math.floor(scaled),
+    palette.length - 2
+  );
+  const amount = scaled - index;
+
+  return palette[index].map((value, channel) =>
+    value + (palette[index + 1][channel] - value) * amount
+  );
+}
+
+function msDrawCloudBlob(x, y, rgb, radius, alpha) {
+  noStroke();
+  fill(rgb[0], rgb[1], rgb[2], alpha);
+  ellipse(x, y, radius * 1.55, radius);
+}
+
 function msDrawTrails() {
 
   const now = millis();
@@ -411,22 +447,16 @@ function msDrawTrails() {
   let modes = [];
 
   if (detected.length >= 2) {
-
     positions = detected.slice(0, 2)
       .map(h => h.fingertip);
-
     modes = ["FINGERTIP", "FINGERTIP"];
-
   } else if (
     detected.length === 1 &&
     detected[0].fist >= 0.63
   ) {
-
     positions = [detected[0].palm];
     modes = ["PALM"];
-
   } else if (detected.length === 1) {
-
     positions = [detected[0].fingertip];
     modes = ["FINGERTIP"];
   }
@@ -443,9 +473,7 @@ function msDrawTrails() {
     }
 
     if (p) {
-
       const old = msTrailPositions[i];
-
       const jump = old
         ? Math.hypot(p.x - old.x, p.y - old.y)
         : 0;
@@ -457,19 +485,11 @@ function msDrawTrails() {
 
         const down = old && p.y - old.y > 1.5;
 
-        const cool =
-          msMode === "VALLEY" ||
-          (
-            msMode === "LOCAL PULL" &&
-            msTargets.some(v => v < 85)
-          ) ||
-          down;
-
         msTrails[i].push({
           x: p.x,
           y: p.y,
           time: now,
-          cool: !!cool
+          direction: down ? "down" : "up"
         });
 
         msTrailPositions[i] = p;
@@ -477,61 +497,72 @@ function msDrawTrails() {
     }
 
     msTrails[i] = msTrails[i].filter(
-      pt => now - pt.time < 900
+      pt => now - pt.time < 1100
     );
 
     const trail = msTrails[i];
+    if (!trail.length) continue;
 
-    for (let j = 1; j < trail.length; j++) {
+    // Paint broad translucent clouds first. The canvas blur makes the
+    // trail dissolve into a soft atmospheric smear rather than a stroke.
+    drawingContext.save();
+    drawingContext.filter = "blur(34px)";
 
-      const a = trail[j - 1];
-      const b = trail[j];
-
-      const fade = msClamp(
-        1 - (now - b.time) / 900,
+    for (let j = 0; j < trail.length; j++) {
+      const pt = trail[j];
+      const life = msClamp(
+        1 - (now - pt.time) / 1100,
         0,
         1
       );
+      const positionFade = 0.28 + 0.72 * (j / trail.length);
+      const palette = msCloudPalette(pt.direction);
+      const rgb = msBlendPalette(
+        palette,
+        j / Math.max(1, trail.length - 1)
+      );
+      const radius = 58 + 42 * life + 10 * Math.sin(j * 0.8);
 
-      const palette = b.cool
-        ? [
-            [69, 107, 255],
-            [0, 169, 255],
-            [56, 228, 245],
-            [140, 255, 226]
-          ]
-        : [
-            [255, 55, 95],
-            [255, 102, 184],
-            [255, 153, 77],
-            [255, 230, 109]
-          ];
-
-      const rgb = palette[
-        Math.floor(j / 5) % 4
-      ];
-
-      // OUTER GLOW
-      stroke(rgb[0], rgb[1], rgb[2], fade * 40);
-      strokeWeight(24);
-      line(a.x, a.y, b.x, b.y);
-
-      // COLOURED TRAIL
-      stroke(rgb[0], rgb[1], rgb[2], fade * 110);
-      strokeWeight(9);
-      line(a.x, a.y, b.x, b.y);
-
-      // BRIGHT CENTRE
-      stroke(255, 245, 240, fade * 220);
-      strokeWeight(2);
-      line(a.x, a.y, b.x, b.y);
+      msDrawCloudBlob(
+        pt.x,
+        pt.y,
+        rgb,
+        radius,
+        16 * life * positionFade
+      );
     }
 
-    if (p) {
-      noStroke();
-      fill(255, 255, 255, 160);
-      circle(p.x, p.y, 9);
+    drawingContext.restore();
+
+    // Add a second, wider and fainter bloom to match the reference image.
+    drawingContext.save();
+    drawingContext.filter = "blur(68px)";
+
+    for (let j = 0; j < trail.length; j += 2) {
+      const pt = trail[j];
+      const life = msClamp(
+        1 - (now - pt.time) / 1100,
+        0,
+        1
+      );
+      const palette = msCloudPalette(pt.direction);
+      const rgb = msBlendPalette(
+        palette,
+        j / Math.max(1, trail.length - 1)
+      );
+
+      msDrawCloudBlob(
+        pt.x,
+        pt.y,
+        rgb,
+        125 + 45 * life,
+        8 * life
+      );
     }
+
+    drawingContext.restore();
+
+    // Deliberately no line(), no stroke(), and no bright white centre.
   }
 }
 
