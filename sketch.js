@@ -1,15 +1,9 @@
 
 // =====================================================
 // MORPHSCAPE FINAL - HAND TRACKING + BLE
-//
-// 36 PHYSICAL UNITS
-// CENTRAL 16 ACTIVE
-//
 // TWO HANDS = INDEX FINGERTIPS
 // ONE FIST = PALM CENTRE
-//
-// CAMERA PREVIEW ENABLED
-// SOFT GRADIENT GLOW
+// CAMERA PREVIEW ENABLED FOR DEBUGGING
 // =====================================================
 
 let handPose;
@@ -18,16 +12,11 @@ let hands = [];
 let resetButton;
 let trackingStatus;
 
-// =====================================================
-// SERVO SETTINGS
-// =====================================================
-
 const MS_COUNT = 16;
 const MS_NEUTRAL = 90;
 const MS_MIN = 5;
 const MS_MAX = 180;
 
-// Confirmed physical servo-to-PCA mapping
 const msChannelForServo = [
   0, 1, 8, 9,
   2, 3, 10, 11,
@@ -35,7 +24,6 @@ const msChannelForServo = [
   6, 7, 14, 15
 ];
 
-// Maximum convex mountain
 const msMountainUp = [
   110, 126, 119, 103,
   135, 166, 151, 114,
@@ -43,7 +31,6 @@ const msMountainUp = [
   105, 132, 121, 99
 ];
 
-// Maximum concave valley
 const msMountainDown = [
   70, 55, 63, 76,
   47, 17, 31, 66,
@@ -51,7 +38,6 @@ const msMountainDown = [
   79, 51, 61, 83
 ];
 
-// Staggered 4 x 4 coordinates
 const msCoordinates = Array.from(
   { length: 16 },
   (_, i) => ({
@@ -60,10 +46,6 @@ const msCoordinates = Array.from(
     y: Math.floor(i / 4) * 0.92
   })
 );
-
-// =====================================================
-// STATE
-// =====================================================
 
 let msTargets = Array(MS_COUNT).fill(MS_NEUTRAL);
 let msCurrent = Array(MS_COUNT).fill(MS_NEUTRAL);
@@ -88,16 +70,13 @@ async function setup() {
   createCanvas(windowWidth, windowHeight);
   pixelDensity(1);
 
-  // Original working BLE setup
   bleSetup();
 
   resetButton = createButton("RESET");
   resetButton.id("resetButton");
   resetButton.mousePressed(msReset);
 
-  trackingStatus =
-    createDiv("Starting hand tracking...");
-
+  trackingStatus = createDiv("Starting hand tracking...");
   trackingStatus.id("trackingStatus");
 
   try {
@@ -133,16 +112,12 @@ async function setup() {
 }
 
 // =====================================================
-// HANDPOSE CALLBACK
+// HANDPOSE
 // =====================================================
 
 function gotHands(results) {
   hands = results;
 }
-
-// =====================================================
-// HELPERS
-// =====================================================
 
 function msClamp(v, lo, hi) {
   return Math.max(lo, Math.min(hi, v));
@@ -163,7 +138,7 @@ function msScreen(hand, i) {
 }
 
 // =====================================================
-// INDEX FINGERTIP
+// INDEX FINGERTIP - TWO-HAND INTERACTION
 // =====================================================
 
 function msFingertip(hand) {
@@ -171,7 +146,7 @@ function msFingertip(hand) {
 }
 
 // =====================================================
-// PALM CENTRE
+// PALM CENTRE - LOCALISED FIST INTERACTION
 // =====================================================
 
 function msPalmCenter(hand) {
@@ -234,8 +209,8 @@ function msFistScore(hand) {
 
 function msReset() {
 
-  msTargets.fill(MS_NEUTRAL);
-  msCurrent.fill(MS_NEUTRAL);
+  msTargets.fill(90);
+  msCurrent.fill(90);
 
   msMode = "READY";
   msTwoPrevious = null;
@@ -266,11 +241,11 @@ function msUpdateGesture() {
     .filter(h => h.fingertip || h.palm);
 
   // TWO-HAND MOUNTAIN / VALLEY
-  if (
-    detected.length >= 2 &&
-    detected[0].fingertip &&
-    detected[1].fingertip
-  ) {
+  // USE INDEX FINGERTIPS
+
+  if (detected.length >= 2 &&
+      detected[0].fingertip &&
+      detected[1].fingertip) {
 
     msGrip = null;
 
@@ -345,6 +320,8 @@ function msUpdateGesture() {
   msWideReference = null;
 
   // ONE-HAND LOCALISED PULL
+  // USE PALM CENTRE
+
   if (
     detected.length === 1 &&
     detected[0].fist >= 0.63 &&
@@ -419,45 +396,16 @@ function msUpdateGesture() {
   }
 
   // RELEASE
+
   msGrip = null;
-  msTargets.fill(MS_NEUTRAL);
+  msTargets.fill(90);
   msMode = "RELEASE";
 }
 
 // =====================================================
-// SOFT GLOW DRAWING
-// Uses p5.js drawing only
-// No extra canvas or DOM elements
-// =====================================================
-
-function msGlowSpot(x, y, rgb, opacity, radius) {
-
-  noStroke();
-
-  // Layered translucent circles create a
-  // feathered gradient with no hard centre line.
-  for (let layer = 12; layer >= 1; layer--) {
-
-    const fraction = layer / 12;
-
-    const r = radius * fraction;
-
-    const alpha =
-      opacity * (1 - fraction) * 0.11;
-
-    fill(
-      rgb[0],
-      rgb[1],
-      rgb[2],
-      alpha
-    );
-
-    circle(x, y, r * 2);
-  }
-}
-
-// =====================================================
 // GLOWING TRAILS
+// TWO HANDS = FINGERTIPS
+// ONE FIST = PALM CENTRE
 // =====================================================
 
 function msDrawTrails() {
@@ -477,6 +425,7 @@ function msDrawTrails() {
 
   if (detected.length >= 2) {
 
+    // TWO-HAND MODE
     positions = detected.slice(0, 2)
       .map(h => h.fingertip);
 
@@ -487,11 +436,13 @@ function msDrawTrails() {
     detected[0].fist >= 0.63
   ) {
 
+    // LOCALISED FIST MODE
     positions = [detected[0].palm];
     modes = ["PALM"];
 
   } else if (detected.length === 1) {
 
+    // OPEN HAND
     positions = [detected[0].fingertip];
     modes = ["FINGERTIP"];
   }
@@ -501,6 +452,7 @@ function msDrawTrails() {
     const p = positions[i] || null;
     const mode = modes[i] || "";
 
+    // CLEAR TRAIL WHEN TRACKING POINT CHANGES
     if (mode !== msTrailModes[i]) {
       msTrails[i] = [];
       msTrailPositions[i] = null;
@@ -511,14 +463,12 @@ function msDrawTrails() {
 
       const old = msTrailPositions[i];
 
+      // Reject sudden large jumps
       const jump = old
         ? Math.hypot(p.x - old.x, p.y - old.y)
         : 0;
 
-      if (
-        !old ||
-        jump < Math.max(width, height) * 0.22
-      ) {
+      if (!old || jump < Math.max(width, height) * 0.22) {
 
         const down = old && p.y - old.y > 1.5;
 
@@ -547,47 +497,55 @@ function msDrawTrails() {
 
     const trail = msTrails[i];
 
-    // Soft gradient cloud following movement
-    for (let j = 0; j < trail.length; j++) {
+    for (let j = 1; j < trail.length; j++) {
 
-      const pt = trail[j];
+      const a = trail[j - 1];
+      const b = trail[j];
 
       const fade = msClamp(
-        1 - (now - pt.time) / 900,
+        1 - (now - b.time) / 900,
         0,
         1
       );
 
-      const palette = pt.cool
+      const palette = b.cool
         ? [
-            [0, 229, 245],
-            [52, 164, 255],
-            [157, 128, 255],
-            [211, 174, 255]
+            [69, 107, 255],
+            [0, 169, 255],
+            [56, 228, 245],
+            [140, 255, 226]
           ]
         : [
-            [255, 76, 124],
-            [255, 119, 181],
-            [255, 166, 95],
-            [255, 223, 112]
+            [255, 55, 95],
+            [255, 102, 184],
+            [255, 153, 77],
+            [255, 230, 109]
           ];
 
-      const rgb =
-        palette[Math.floor(j / 4) % 4];
+      const rgb = palette[
+        Math.floor(j / 5) % 4
+      ];
 
-      const radius = Math.min(
-        width * 0.09,
-        height * 0.15,
-        105
-      );
+      // OUTER GLOW
+      stroke(rgb[0], rgb[1], rgb[2], fade * 40);
+      strokeWeight(24);
+      line(a.x, a.y, b.x, b.y);
 
-      msGlowSpot(
-        pt.x,
-        pt.y,
-        rgb,
-        fade * 85,
-        radius
-      );
+      // COLOURED TRAIL
+      stroke(rgb[0], rgb[1], rgb[2], fade * 110);
+      strokeWeight(9);
+      line(a.x, a.y, b.x, b.y);
+
+      // BRIGHT CENTRE
+      stroke(255, 245, 240, fade * 220);
+      strokeWeight(2);
+      line(a.x, a.y, b.x, b.y);
+    }
+
+    if (p) {
+      noStroke();
+      fill(255, 255, 255, 160);
+      circle(p.x, p.y, 9);
     }
   }
 }
