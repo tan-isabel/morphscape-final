@@ -1,7 +1,7 @@
 
- // MORPHSCAPE FINAL
-// Experiment 1E hand tracking + BLE foundation
-// TEMPORARY CAMERA PREVIEW ENABLED FOR DEBUGGING
+ // MORPHSCAPE FINAL - built on the working Experiment 1E p5/ml5/BLE setup.
+// Only the gesture behaviour, black presentation, and light trails differ.
+// 36 physical units, central 16 active, PCA9685 0x40, ESP32-S3 GPIO8/9.
 
 let handPose;
 let video;
@@ -593,12 +593,13 @@ function draw() {
 
   background(0);
 
-  // ===================================================
   // TEMPORARY MIRRORED SELFIE CAMERA PREVIEW
-  // THIS IS THE ONLY NEW FEATURE FOR DEBUGGING
-  // ===================================================
-
-  if (video && video.elt.readyState >= 2) {
+  // Same camera display method as Experiment 1E
+  if (
+    video &&
+    video.elt &&
+    video.elt.readyState >= 2
+  ) {
 
     push();
 
@@ -615,10 +616,6 @@ function draw() {
 
     pop();
   }
-
-  // ===================================================
-  // ORIGINAL MORPHSCAPE FUNCTIONS
-  // ===================================================
 
   msUpdateGesture();
 
