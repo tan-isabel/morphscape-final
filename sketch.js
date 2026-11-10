@@ -1,5 +1,5 @@
 
-// =====================================================
+ // =====================================================
 // MORPHSCAPE FINAL - HAND TRACKING + BLE
 //
 // 36 PHYSICAL UNITS
@@ -425,25 +425,25 @@ function msUpdateGesture() {
 }
 
 // =====================================================
-// SOFT GLOW DRAWING
-// Uses p5.js drawing only
-// No extra canvas or DOM elements
+// SOFT DIFFUSED GLOW
+// VISUAL CHANGE ONLY
 // =====================================================
 
 function msGlowSpot(x, y, rgb, opacity, radius) {
 
   noStroke();
 
-  // Layered translucent circles create a
-  // feathered gradient with no hard centre line.
-  for (let layer = 12; layer >= 1; layer--) {
+  // Many overlapping translucent layers
+  // create a soft, feathered glow.
+  for (let layer = 24; layer >= 1; layer--) {
 
-    const fraction = layer / 12;
-
+    const fraction = layer / 24;
     const r = radius * fraction;
 
     const alpha =
-      opacity * (1 - fraction) * 0.11;
+      opacity *
+      Math.pow(1 - fraction, 1.8) *
+      0.035;
 
     fill(
       rgb[0],
@@ -547,7 +547,6 @@ function msDrawTrails() {
 
     const trail = msTrails[i];
 
-    // Soft gradient cloud following movement
     for (let j = 0; j < trail.length; j++) {
 
       const pt = trail[j];
