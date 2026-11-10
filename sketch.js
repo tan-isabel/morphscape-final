@@ -425,56 +425,35 @@ function msUpdateGesture() {
 }
 
 // =====================================================
-// SOFT RADIAL GRADIENT GLOW
+// SOFT DIFFUSED GLOW
+// VISUAL CHANGE ONLY
 // =====================================================
 
 function msGlowSpot(x, y, rgb, opacity, radius) {
 
-  // Draw directly on the EXISTING p5 canvas.
-  // No extra canvas, scripts, or changes to tracking/BLE.
-  const ctx = drawingContext;
-  const strength = msClamp(opacity / 85, 0, 1);
+  noStroke();
 
-  if (strength <= 0) return;
+  // Many overlapping translucent layers
+  // create a soft, feathered glow.
+  for (let layer = 24; layer >= 1; layer--) {
 
-  const gradient = ctx.createRadialGradient(
-    x, y, 0,
-    x, y, radius
-  );
+    const fraction = layer / 24;
+    const r = radius * fraction;
 
-  const c = rgb.join(",");
+    const alpha =
+      opacity *
+      Math.pow(1 - fraction, 1.8) *
+      0.035;
 
-  gradient.addColorStop(
-    0,
-    `rgba(${c},${0.16 * strength})`
-  );
+    fill(
+      rgb[0],
+      rgb[1],
+      rgb[2],
+      alpha
+    );
 
-  gradient.addColorStop(
-    0.30,
-    `rgba(${c},${0.12 * strength})`
-  );
-
-  gradient.addColorStop(
-    0.60,
-    `rgba(${c},${0.045 * strength})`
-  );
-
-  gradient.addColorStop(
-    0.85,
-    `rgba(${c},${0.009 * strength})`
-  );
-
-  gradient.addColorStop(
-    1,
-    `rgba(${c},0)`
-  );
-
-  ctx.save();
-  ctx.fillStyle = gradient;
-  ctx.beginPath();
-  ctx.arc(x, y, radius, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
+    circle(x, y, r * 2);
+  }
 }
 
 // =====================================================
@@ -568,7 +547,6 @@ function msDrawTrails() {
 
     const trail = msTrails[i];
 
-    // Soft gradient cloud following movement
     for (let j = 0; j < trail.length; j++) {
 
       const pt = trail[j];
